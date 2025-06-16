@@ -26,6 +26,9 @@
  *      - Added the autoplay feature.
  *      - Allowed users to drag the mouse cursor to change tiles.
  *      - Moved around a lot of code.
+ * @version 17/06/2025
+ *      - Added saving/loading features.
+ *      - Birthday.
  */
 // Imports for User Interface and GUI.
 import javax.swing.*;
@@ -34,7 +37,6 @@ import java.awt.event.*;
 import java.awt.geom.*;
 import java.awt.image.BufferedImage; // For removing screen flash.
 import java.awt.PointerInfo;
-
 public class GameOfLife extends JFrame implements ActionListener, MouseListener
 {
     // Menu Bar
@@ -75,7 +77,6 @@ public class GameOfLife extends JFrame implements ActionListener, MouseListener
      */
     public GameOfLife()
     {
-        System.out.println("Hello world!");
         setTitle("Conway's Game of Life");
         this.getContentPane().setPreferredSize(new Dimension(SCREEN_WIDTH, SCREEN_HEIGHT));
         this.getContentPane().setLayout(null);
@@ -203,16 +204,27 @@ public class GameOfLife extends JFrame implements ActionListener, MouseListener
                 repaint();
                 break;
             case "Print":
-                String brd = getGameBoard();
-                System.out.println(brd);
-                int[][] tileSet = new int[TILE_COLS][TILE_ROWS];
-                String[] ybrd = brd.split("|");
-                for (int y = 0; y < ybrd.length; y++){
-                    System.out.println(y);
-                    String[] xbrd = ybrd[y].split(",");
-                    for (int x = 0; x < xbrd.length; x++){
-                        System.out.print(x);
-                        tileSet[y][x] = Integer.parseInt(xbrd[x]);
+                String board = getGameBoard();
+                System.out.println("Your board is:");
+                System.out.println(board);
+                System.out.println("Copy this and save it in a .txt file.");
+                repaint();
+                break;
+            case "Load":
+                InputDialog getFile = new InputDialog("Enter the name of your file:");
+                getFile.setLocationRelativeTo(this);
+                getFile.setVisible(true);
+                String userFile = getFile.getText();
+                String toDecode = "";
+                try {
+                    toDecode = FileScanner.readFile("./SavedGames/"+userFile+".txt");
+                } catch (Exception e) {
+                    toDecode = FileScanner.readFile("./SavedGames/Error.txt");
+                }
+                int[][] decodedBoard = decodeGameBoard(toDecode);
+                for (int y = 0; y < TILE_ROWS; y++){
+                    for (int x = 0; x < TILE_COLS; x++){
+                        tileList[y][x] = decodedBoard[y][x];
                     }
                 }
                 repaint();
@@ -440,6 +452,10 @@ public class GameOfLife extends JFrame implements ActionListener, MouseListener
         menuItem = new JMenuItem("Print");
         menuItem.addActionListener(this);
         menu.add(menuItem);
+        // Game : Load
+        menuItem = new JMenuItem("Load");
+        menuItem.addActionListener(this);
+        menu.add(menuItem);
 
         // The UI menu.
         menu = new JMenu("Interface");
@@ -506,8 +522,8 @@ public class GameOfLife extends JFrame implements ActionListener, MouseListener
     public String getGameBoard()
     {
         String text = "";
-        for (int y = 0; y < TILE_COLS; y++){
-            for (int x = 0; x < TILE_ROWS; x++){
+        for (int y = 0; y < TILE_ROWS; y++){
+            for (int x = 0; x < TILE_COLS; x++){
                 if (x == TILE_ROWS-1){
                     text = text+tileList[y][x];
                 } else{
@@ -515,10 +531,42 @@ public class GameOfLife extends JFrame implements ActionListener, MouseListener
                 }
             }
             if (y != TILE_COLS-1){
-                text = text+"|";
+                text = text+"-";
             }
         }
         return text;
+    }
+
+    /**
+     * Decodes an encoded game board, returning the result in a 2 dimensional array.
+     *
+     * @param encodedBoard - The encoded game board, comma separated along the x axis and pipe separated along the y axis.
+     * @return The decoded version of the game board as an int[][] array.
+     */
+    public int[][] decodeGameBoard(String encodedBoard)
+    {
+        String[] stringBoardRows = encodedBoard.split("-");
+        if (stringBoardRows.length > TILE_ROWS){
+            System.out.println("Error! Too many rows in the encoded board!");
+            System.out.println("Expected: "+TILE_ROWS+"! Got: "+stringBoardRows.length+"!");
+            throw new Error("RowLimitExceededError");
+        }
+        String[][] stringBoardFull = new String[TILE_ROWS][TILE_COLS];
+        for (int i = 0; i < stringBoardRows.length; i++){
+            if (stringBoardRows[i].split(",").length > TILE_COLS){
+                System.out.println("Error! Too many cols in the encoded board at index: "+i+"!");
+                System.out.println("Expected: "+TILE_COLS+"! Got: "+stringBoardRows[i].split(",").length+"!");
+                throw new Error("ColLimitExceededError");
+            }
+            stringBoardFull[i] = stringBoardRows[i].split(",");
+        }
+        int[][] parsedBoard = new int[TILE_ROWS][TILE_COLS];
+        for (int y = 0; y < TILE_ROWS; y++){
+            for (int x = 0; x < TILE_COLS; x++){
+                parsedBoard[y][x] = Integer.parseInt(stringBoardFull[y][x]);
+            }
+        }
+        return parsedBoard;
     }
 
 }
