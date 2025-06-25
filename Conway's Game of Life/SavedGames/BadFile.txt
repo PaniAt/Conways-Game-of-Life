@@ -1,0 +1,2 @@
+This isn't a valid game board file!
+>:)

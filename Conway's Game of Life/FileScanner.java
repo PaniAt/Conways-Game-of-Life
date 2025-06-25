@@ -12,7 +12,7 @@ import java.io.IOException;
 public class FileScanner
 {
     /**
-     * Does nothing.
+     * You do not need to create a FileScanner class, as all the methods are in static context.
      */
     public FileScanner(){}
 
@@ -25,18 +25,16 @@ public class FileScanner
     static public String readFile(String fileName)
     {
         // Gets the file
-        File myFile = new File(fileName);
+        File targetFile = new File(fileName);
         String fileText = "";
         try {
-            Scanner fileReader = new Scanner(myFile);
+            Scanner fileReader = new Scanner(targetFile);
             while (fileReader.hasNextLine()){
                 fileText = fileText+fileReader.nextLine();
             }
         }
-        catch (IOException e) { // If there is an error with the file
-            e.printStackTrace();
-            System.out.println("Unable to locate file path!");
-            throw new Error("FileNotFoundError");
+        catch (IOException e) { // The file could not be found.
+            return "NoFileError";
         }
         return fileText;
     }

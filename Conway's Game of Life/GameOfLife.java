@@ -29,6 +29,8 @@
  * @version 17/06/2025
  *      - Added saving/loading features.
  *      - Birthday.
+ * @version 18/06/2025
+ *      - Added error handling for loading games.
  */
 // Imports for User Interface and GUI.
 import javax.swing.*;
@@ -68,6 +70,7 @@ public class GameOfLife extends JFrame implements ActionListener, MouseListener
     int showGrid = 0;
     int colourMode = 1; // 1 - Normal colours | 0 - Inverted colours
     Color[] colourScheme = new Color[2];
+    boolean debugMode = true;
 
     // Timing Variables
     int gameTimer = 0;
@@ -207,27 +210,40 @@ public class GameOfLife extends JFrame implements ActionListener, MouseListener
                 String board = getGameBoard();
                 System.out.println("Your board is:");
                 System.out.println(board);
-                System.out.println("Copy this and save it in a .txt file.");
+                System.out.println("Copy this and save it in a .txt file in your SavedGames folder.");
                 repaint();
                 break;
             case "Load":
+                repaint();
                 InputDialog getFile = new InputDialog("Enter the name of your file:");
                 getFile.setLocationRelativeTo(this);
                 getFile.setVisible(true);
                 String userFile = getFile.getText();
-                String toDecode = "";
-                try {
-                    toDecode = FileScanner.readFile("./SavedGames/"+userFile+".txt");
-                } catch (Exception e) {
-                    toDecode = FileScanner.readFile("./SavedGames/Error.txt");
-                }
-                int[][] decodedBoard = decodeGameBoard(toDecode);
-                for (int y = 0; y < TILE_ROWS; y++){
-                    for (int x = 0; x < TILE_COLS; x++){
-                        tileList[y][x] = decodedBoard[y][x];
+                String toDecode = FileScanner.readFile("./SavedGames/"+userFile+".txt");
+                if (!toDecode.equals("NoFileError")){
+                    int[][] decodedBoard = decodeGameBoard(toDecode);
+                    switch (decodedBoard[0][0]){
+                        case -1:
+                            createPopup("There are too many rows in that file!");
+                            break;
+                        case -2:
+                            createPopup("There are too many columns in that file!");
+                            break;
+                        case -3:
+                            createPopup("That file contains an invalid character!");
+                            break;
+                        default: // Not an error code.
+                            for (int y = 0; y < TILE_ROWS; y++){
+                                for (int x = 0; x < TILE_COLS; x++){
+                                    tileList[y][x] = decodedBoard[y][x];
+                                }
+                            }
+                            repaint();
+                            break;
                     }
+                } else {
+                    createPopup("That file path was invalid! Open your SavedGames folder to view all files!");
                 }
-                repaint();
                 break;
             case "Toggle Grid":
                 showGrid = 1 - showGrid;
@@ -546,23 +562,37 @@ public class GameOfLife extends JFrame implements ActionListener, MouseListener
     public int[][] decodeGameBoard(String encodedBoard)
     {
         String[] stringBoardRows = encodedBoard.split("-");
-        if (stringBoardRows.length > TILE_ROWS){
-            System.out.println("Error! Too many rows in the encoded board!");
-            System.out.println("Expected: "+TILE_ROWS+"! Got: "+stringBoardRows.length+"!");
-            throw new Error("RowLimitExceededError");
+        if (stringBoardRows.length != TILE_ROWS){
+            if (debugMode){
+                System.out.println("Error! Too many rows in the encoded board!");
+                System.out.println("Expected: "+TILE_ROWS+"! Got: "+stringBoardRows.length+"!");
+            }
+            int[][] errorBoard = {{-1}};
+            return errorBoard; // Rows wrong
         }
         String[][] stringBoardFull = new String[TILE_ROWS][TILE_COLS];
         for (int i = 0; i < stringBoardRows.length; i++){
-            if (stringBoardRows[i].split(",").length > TILE_COLS){
-                System.out.println("Error! Too many cols in the encoded board at index: "+i+"!");
-                System.out.println("Expected: "+TILE_COLS+"! Got: "+stringBoardRows[i].split(",").length+"!");
-                throw new Error("ColLimitExceededError");
+            if (stringBoardRows[i].split(",").length != TILE_COLS){
+                if (debugMode){
+                    System.out.println("Error! Too many cols in the encoded board at index: "+i+"!");
+                    System.out.println("Expected: "+TILE_COLS+"! Got: "+stringBoardRows[i].split(",").length+"!");
+                }
+                int[][] errorBoard = {{-2}};
+                return errorBoard; // Cols wrong
             }
             stringBoardFull[i] = stringBoardRows[i].split(",");
         }
         int[][] parsedBoard = new int[TILE_ROWS][TILE_COLS];
         for (int y = 0; y < TILE_ROWS; y++){
             for (int x = 0; x < TILE_COLS; x++){
+                if (!stringBoardFull[y][x].equals("1") && !stringBoardFull[y][x].equals("0")){
+                    if (debugMode){
+                        System.out.println("Error! Did not recieve either 0 or 1 when reading file!");
+                        System.out.println("At: (x:"+x+",y:"+y+"), Got: "+stringBoardFull[y][x]+"!"); 
+                    }
+                    int[][] errorBoard = {{-1}};
+                    return errorBoard; // Invalid tile state
+                }
                 parsedBoard[y][x] = Integer.parseInt(stringBoardFull[y][x]);
             }
         }

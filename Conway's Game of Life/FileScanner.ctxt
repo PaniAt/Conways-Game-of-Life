@@ -2,7 +2,7 @@
 comment0.target=FileScanner
 comment1.params=
 comment1.target=FileScanner()
-comment1.text=\r\n\ Does\ nothing.\r\n
+comment1.text=\r\n\ You\ do\ not\ need\ to\ create\ a\ FileScanner\ class,\ as\ all\ the\ methods\ are\ in\ static\ context.\r\n
 comment2.params=fileName
 comment2.target=java.lang.String\ readFile(java.lang.String)
 comment2.text=\r\n\ Returns\ out\ the\ contents\ of\ an\ entered\ .txt\ file.\r\n\r\n\ @param\ \ fileName\ -\ The\ name\ of\ the\ file\ to\ be\ scanned\r\n\ @return\ The\ contents\ of\ the\ file\r\n
