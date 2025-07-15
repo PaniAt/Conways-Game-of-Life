@@ -31,6 +31,10 @@
  *      - Birthday.
  * @version 18/06/2025
  *      - Added error handling for loading games.
+ * @version 16/06/2025
+ *      - Removed the print game feature
+ *      - Added the save game feature
+ *      - Mostly finished saving/loading
  */
 // Imports for User Interface and GUI.
 import javax.swing.*;
@@ -39,6 +43,12 @@ import java.awt.event.*;
 import java.awt.geom.*;
 import java.awt.image.BufferedImage; // For removing screen flash.
 import java.awt.PointerInfo;
+import java.io.FileWriter;
+
+// File handling
+import java.io.File;
+import java.io.IOException;
+
 public class GameOfLife extends JFrame implements ActionListener, MouseListener
 {
     // Menu Bar
@@ -206,11 +216,29 @@ public class GameOfLife extends JFrame implements ActionListener, MouseListener
                 }
                 repaint();
                 break;
-            case "Print":
+            case "Save":
+                repaint();
                 String board = getGameBoard();
-                System.out.println("Your board is:");
-                System.out.println(board);
-                System.out.println("Copy this and save it in a .txt file in your SavedGames folder.");
+                InputDialog getSaveFile = new InputDialog("What do you want to name this save?");
+                getSaveFile.setLocationRelativeTo(this);
+                getSaveFile.setVisible(true);
+                String saveFileName = "./SavedGames/"+getSaveFile.getText()+".txt";
+                // Create the file, overrides any pre-existing file with the same name.
+                try{
+                    File saveFile = new File(saveFileName);
+                    if (!saveFile.createNewFile()){
+                        saveFile.delete();
+                        saveFile.createNewFile();
+                    }
+                    FileWriter fileWriter = new FileWriter(saveFileName);
+                    fileWriter.write(board);
+                    fileWriter.close(); // BlueJ said I'd have a memory leak, which sounds bad.
+                } catch (IOException e){
+                    if (debugMode){
+                        e.printStackTrace();
+                    }
+                    createPopup("There was an error creating the file!"); // "Help users recognise, diagnose and recover from errors"
+                }
                 repaint();
                 break;
             case "Load":
@@ -465,7 +493,7 @@ public class GameOfLife extends JFrame implements ActionListener, MouseListener
         menuItem.addActionListener(this);
         menu.add(menuItem);
         // Game : Print
-        menuItem = new JMenuItem("Print");
+        menuItem = new JMenuItem("Save");
         menuItem.addActionListener(this);
         menu.add(menuItem);
         // Game : Load
@@ -562,12 +590,13 @@ public class GameOfLife extends JFrame implements ActionListener, MouseListener
     public int[][] decodeGameBoard(String encodedBoard)
     {
         String[] stringBoardRows = encodedBoard.split("-");
+        int[][] errorBoard = new int[1][1]; // To output when an error occurs.
         if (stringBoardRows.length != TILE_ROWS){
             if (debugMode){
                 System.out.println("Error! Too many rows in the encoded board!");
                 System.out.println("Expected: "+TILE_ROWS+"! Got: "+stringBoardRows.length+"!");
             }
-            int[][] errorBoard = {{-1}};
+            errorBoard[0][0] = -1;
             return errorBoard; // Rows wrong
         }
         String[][] stringBoardFull = new String[TILE_ROWS][TILE_COLS];
@@ -577,7 +606,7 @@ public class GameOfLife extends JFrame implements ActionListener, MouseListener
                     System.out.println("Error! Too many cols in the encoded board at index: "+i+"!");
                     System.out.println("Expected: "+TILE_COLS+"! Got: "+stringBoardRows[i].split(",").length+"!");
                 }
-                int[][] errorBoard = {{-2}};
+                errorBoard[0][0] = -2;
                 return errorBoard; // Cols wrong
             }
             stringBoardFull[i] = stringBoardRows[i].split(",");
@@ -590,7 +619,7 @@ public class GameOfLife extends JFrame implements ActionListener, MouseListener
                         System.out.println("Error! Did not recieve either 0 or 1 when reading file!");
                         System.out.println("At: (x:"+x+",y:"+y+"), Got: "+stringBoardFull[y][x]+"!"); 
                     }
-                    int[][] errorBoard = {{-1}};
+                    errorBoard[0][0] = -3;
                     return errorBoard; // Invalid tile state
                 }
                 parsedBoard[y][x] = Integer.parseInt(stringBoardFull[y][x]);
