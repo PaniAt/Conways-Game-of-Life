@@ -31,10 +31,19 @@
  *      - Birthday.
  * @version 18/06/2025
  *      - Added error handling for loading games.
- * @version 16/06/2025
- *      - Removed the print game feature
- *      - Added the save game feature
- *      - Mostly finished saving/loading
+ * @version 16/07/2025
+ *      - Removed the print game feature.
+ *      - Added the save game feature.
+ *      - Mostly finished saving/loading.
+ * @version 17/07/2025
+ *      - Removed the unused "proxList" array.
+ *      - Added a barely-working undo system.
+ * @version 18/07/2025
+ *      - Improved the undo system.
+ *      - Minor changes to mouse logic.
+ *      - Allowed "undoing" your undo.
+ * @version 21/07/2025
+ *      - Changed the colour schemes slightly.
  */
 // Imports for User Interface and GUI.
 import javax.swing.*;
@@ -68,7 +77,7 @@ public class GameOfLife extends JFrame implements ActionListener, MouseListener
     final int TILE_COLS = 80;
     final int TILE_SIZE = SCREEN_WIDTH/TILE_ROWS;
     int[][] tileList = new int[TILE_COLS][TILE_ROWS]; // List of tiles dead/alive
-    int[][] proxList = new int[TILE_COLS][TILE_ROWS]; // List of live neighbour cells count
+    int[][] prevTileList = new int[TILE_COLS][TILE_ROWS]; // List of the previous tile list, for the undo action.
 
     // Mouse Variables
     int[] mousePosition = new int[2]; // 0 - mouse x | 1 - mouse y
@@ -108,7 +117,6 @@ public class GameOfLife extends JFrame implements ActionListener, MouseListener
 
         while (true){
             gameTimer++;
-
             if (autoplay){
                 if (gameTimer % 100 == 0){
                     gameStep();
@@ -174,20 +182,18 @@ public class GameOfLife extends JFrame implements ActionListener, MouseListener
                 System.exit(0);
                 break;
             case "Reset":
-                for (int y = 0; y < TILE_ROWS; y++){
-                    for (int x = 0; x < TILE_COLS; x++){
-                        tileList[y][x] = 0;
-                    }
-                }
+                prevTileList = tileList.clone();
+                tileList = new int[TILE_COLS][TILE_ROWS];
                 repaint();
                 break;
             case "Step 1 Frame":
+                prevTileList = tileList.clone();
                 gameStep();
                 repaint();
                 break;
             case "Step Custom Frames":
                 repaint();
-                InputDialog userInput = new InputDialog("Enter how many frames you want to step:");
+                InputDialog userInput = new InputDialog("Enter how many frames you want to step (1-1000):");
                 userInput.setLocationRelativeTo(this);
                 userInput.setVisible(true);
                 String userResponse = userInput.getText();
@@ -199,6 +205,7 @@ public class GameOfLife extends JFrame implements ActionListener, MouseListener
                     } else if (stepAmount > 1000){ // Too many will make a huge delay.
                         createPopup("Please enter a number fewer than 1,000!");
                     } else {
+                        prevTileList = tileList.clone();
                         for (int i = 0; i < stepAmount; i++){
                             gameStep();
                         }
@@ -212,6 +219,7 @@ public class GameOfLife extends JFrame implements ActionListener, MouseListener
                 if (autoplay){
                     autoplay = false;
                 } else {
+                    prevTileList = tileList.clone();
                     autoplay = true;
                 }
                 repaint();
@@ -260,9 +268,11 @@ public class GameOfLife extends JFrame implements ActionListener, MouseListener
                         case -3:
                             createPopup("That file contains an invalid character!");
                             break;
-                        default: // Not an error code.
+                        default: // No error code!
+                            prevTileList = new int[TILE_COLS][TILE_ROWS];
                             for (int y = 0; y < TILE_ROWS; y++){
                                 for (int x = 0; x < TILE_COLS; x++){
+                                    prevTileList[y][x] = tileList[y][x];
                                     tileList[y][x] = decodedBoard[y][x];
                                 }
                             }
@@ -273,6 +283,24 @@ public class GameOfLife extends JFrame implements ActionListener, MouseListener
                     createPopup("That file path was invalid! Open your SavedGames folder to view all files!");
                 }
                 break;
+            case "Undo":
+                boolean canUndo = false;
+                for (int y = 0; y < TILE_ROWS && !canUndo; y++){
+                    for (int x = 0; x < TILE_COLS && !canUndo; x++){
+                        if (prevTileList[y][x] != tileList[y][x]){
+                            canUndo = true;
+                        }
+                    }
+                }
+                if (!canUndo){
+                    createPopup("There is nothing to undo!");
+                } else if (autoplay) {
+                    createPopup("You cannot undo while autoplay is active!");
+                } else{
+                    revertGameBoard();
+                }
+                repaint();
+                break;
             case "Toggle Grid":
                 showGrid = 1 - showGrid;
                 repaint();
@@ -282,43 +310,43 @@ public class GameOfLife extends JFrame implements ActionListener, MouseListener
                 repaint();
                 break;
             case "Red":
-                colourScheme[0] = new Color(255, 50, 50);
-                colourScheme[1] = new Color(220, 10, 10);
+                colourScheme[0] = new Color(240, 85, 110);
+                colourScheme[1] = new Color(220, 20, 50);
                 repaint();
                 break;
             case "Orange":
-                colourScheme[0] = new Color(255, 130, 50);
-                colourScheme[1] = new Color(220, 110, 10);
+                colourScheme[0] = new Color(230, 95, 15);
+                colourScheme[1] = new Color(220, 50, 15);
                 repaint();
                 break;
             case "Yellow":
-                colourScheme[0] = new Color(255, 255, 50);
-                colourScheme[1] = new Color(220, 220, 10);
+                colourScheme[0] = new Color(255, 190, 30);
+                colourScheme[1] = new Color(250, 169, 15);
                 repaint();
                 break;
             case "Green":
-                colourScheme[0] = new Color(50, 255, 50);
-                colourScheme[1] = new Color(10, 220, 10);
+                colourScheme[0] = new Color(205, 255, 50);
+                colourScheme[1] = new Color(110, 220, 20);
                 repaint();
                 break;
             case "Light Blue":
-                colourScheme[0] = new Color(50, 130, 255);
-                colourScheme[1] = new Color(10, 110, 220);
+                colourScheme[0] = new Color(145, 225, 240);
+                colourScheme[1] = new Color(0, 180, 220);
                 repaint();
                 break;
             case "Dark Blue":
-                colourScheme[0] = new Color(50, 50, 255);
-                colourScheme[1] = new Color(10, 10, 220);
+                colourScheme[0] = new Color(0, 120, 180);
+                colourScheme[1] = new Color(10, 10, 95);
                 repaint();
                 break;
             case "Purple":
-                colourScheme[0] = new Color(130, 50, 255);
-                colourScheme[1] = new Color(110, 10, 220);
+                colourScheme[0] = new Color(190, 100, 230);
+                colourScheme[1] = new Color(65, 10, 95);
                 repaint();
                 break;
             case "Pink":
-                colourScheme[0] = new Color(255, 50, 130);
-                colourScheme[1] = new Color(220, 10, 110);
+                colourScheme[0] = new Color(255, 195, 230);
+                colourScheme[1] = new Color(255, 145, 180);
                 repaint();
                 break;
             case "Grey":
@@ -384,7 +412,6 @@ public class GameOfLife extends JFrame implements ActionListener, MouseListener
                         }
                     }
                 }
-                proxList[y][x] = nearbyTiles;
                 // Live cells with fewer than two neighbours DIES!
                 if (tileList[y][x] == 1 && nearbyTiles < 2) {
                     targetTileList[y][x] = 0;
@@ -404,6 +431,16 @@ public class GameOfLife extends JFrame implements ActionListener, MouseListener
             }
         }
         tileList = targetTileList;
+    }
+
+    /**
+     * Undoes the user's last action that could've changed the board.
+     */
+    public void revertGameBoard()
+    {
+        int[][] tempTileList = tileList.clone();
+        tileList = prevTileList.clone();
+        prevTileList = tempTileList.clone();
     }
 
     /**
@@ -429,8 +466,10 @@ public class GameOfLife extends JFrame implements ActionListener, MouseListener
     public void mouseReleased(MouseEvent evt){
         if (mouseDown){
             mouseDown = false;
+            prevTileList = new int[TILE_COLS][TILE_ROWS];
             for(int y = 0; y < TILE_ROWS; y++){
                 for (int x = 0; x < TILE_COLS; x++){
+                    prevTileList[y][x] = tileList[y][x];
                     if (mouseChangedTiles[y][x] == 1){
                         tileList[y][x] = 1 - tileList[y][x];
                         mouseChangedTiles[y][x] = 0;
@@ -445,8 +484,9 @@ public class GameOfLife extends JFrame implements ActionListener, MouseListener
         int type = evt.getButton();
         if (type == 1){
             mouseDown = true;
+            prevTileList = tileList.clone();
             mouseDownActions();
-        } else if (type == 3) {
+        } else if (type == 3 && mouseDown) {
             mouseDown = false;
             mouseChangedTiles = new int[TILE_COLS][TILE_ROWS];
             repaint();
@@ -500,6 +540,11 @@ public class GameOfLife extends JFrame implements ActionListener, MouseListener
         menuItem = new JMenuItem("Load");
         menuItem.addActionListener(this);
         menu.add(menuItem);
+        // Game : Undo
+        menuItem = new JMenuItem("Undo");
+        menuItem.setAccelerator(KeyStroke.getKeyStroke('z'));
+        menuItem.addActionListener(this);
+        menu.add(menuItem);
 
         // The UI menu.
         menu = new JMenu("Interface");
@@ -513,43 +558,43 @@ public class GameOfLife extends JFrame implements ActionListener, MouseListener
         JMenu subMenu = new JMenu("Colour Scheme");
         menu.add(subMenu);
         // UI : Colour Scheme : Default
-        menuItem = new JMenuItem("Default"); // WHITE ; BLACK
+        menuItem = new JMenuItem("Default");
         menuItem.addActionListener(this);
         subMenu.add(menuItem);
         // UI : Colour Scheme : Red
-        menuItem = new JMenuItem("Red"); // (255, 50, 50) ; (220, 10, 10)
+        menuItem = new JMenuItem("Red");
         menuItem.addActionListener(this);
         subMenu.add(menuItem);
         // UI : Colour Scheme : Orange
-        menuItem = new JMenuItem("Orange"); // (255, 130, 50) ; (220, 110, 10)
+        menuItem = new JMenuItem("Orange");
         menuItem.addActionListener(this);
         subMenu.add(menuItem);
         // UI : Colour Scheme : Yellow
-        menuItem = new JMenuItem("Yellow"); // (255, 255, 50) ; (220, 220, 10)
+        menuItem = new JMenuItem("Yellow");
         menuItem.addActionListener(this);
         subMenu.add(menuItem);
         // UI : Colour Scheme : Green
-        menuItem = new JMenuItem("Green"); // (50, 255, 50) ; (10, 220, 10)
+        menuItem = new JMenuItem("Green");
         menuItem.addActionListener(this);
         subMenu.add(menuItem);
         // UI : Colour Scheme : Light Blue
-        menuItem = new JMenuItem("Light Blue"); // (50, 130, 255) ; (10, 110, 220)
+        menuItem = new JMenuItem("Light Blue");
         menuItem.addActionListener(this);
         subMenu.add(menuItem);
         // UI : Colour Scheme : Dark Blue
-        menuItem = new JMenuItem("Dark Blue"); // (50, 50, 255) ; (10, 10, 220);
+        menuItem = new JMenuItem("Dark Blue");
         menuItem.addActionListener(this);
         subMenu.add(menuItem);
         // UI : Colour Scheme : Purple
-        menuItem = new JMenuItem("Purple"); // (130, 50, 255) ; (110, 10, 220)
+        menuItem = new JMenuItem("Purple");
         menuItem.addActionListener(this);
         subMenu.add(menuItem);
         // UI : Colour Scheme : Pink
-        menuItem = new JMenuItem("Pink"); // (255, 50, 130) ; (220, 10, 110)
+        menuItem = new JMenuItem("Pink");
         menuItem.addActionListener(this);
         subMenu.add(menuItem);
         // UI : Colour Scheme : Grey
-        menuItem = new JMenuItem("Grey"); // (stupid US spelling) GRAY ; DARK_GRAY
+        menuItem = new JMenuItem("Grey");
         menuItem.addActionListener(this);
         subMenu.add(menuItem);
         // UI : Colour Scheme : Toggle Inverted
@@ -627,5 +672,4 @@ public class GameOfLife extends JFrame implements ActionListener, MouseListener
         }
         return parsedBoard;
     }
-
 }
