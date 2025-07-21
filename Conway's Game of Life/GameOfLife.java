@@ -44,6 +44,10 @@
  *      - Allowed "undoing" your undo.
  * @version 21/07/2025
  *      - Changed the colour schemes slightly.
+ *      - Added some preset game boards for the user.
+ * @version 22/07/2025
+ *      - Added preset a few more preset game boards.
+ *      - Allowed mouse actions during autoplay.
  */
 // Imports for User Interface and GUI.
 import javax.swing.*;
@@ -60,10 +64,6 @@ import java.io.IOException;
 
 public class GameOfLife extends JFrame implements ActionListener, MouseListener
 {
-    // Menu Bar
-    JMenuBar menuBar;
-    JMenu menu;
-    JMenuItem menuItem;
     // Global popup message variable to prevent alerts from stacking.
     Popup popupMessage;
     // Screen Dimensions
@@ -75,7 +75,8 @@ public class GameOfLife extends JFrame implements ActionListener, MouseListener
     // Tile List
     final int TILE_ROWS = 80;
     final int TILE_COLS = 80;
-    final int TILE_SIZE = SCREEN_WIDTH/TILE_ROWS;
+    final int TILE_WIDTH = SCREEN_WIDTH/TILE_COLS;
+    final int TILE_HEIGHT = SCREEN_HEIGHT/TILE_ROWS;
     int[][] tileList = new int[TILE_COLS][TILE_ROWS]; // List of tiles dead/alive
     int[][] prevTileList = new int[TILE_COLS][TILE_ROWS]; // List of the previous tile list, for the undo action.
 
@@ -86,6 +87,7 @@ public class GameOfLife extends JFrame implements ActionListener, MouseListener
     boolean didMouseChangeTile = false; // Checks if a tile was changed in the mouseChangedTiles array.
 
     // Interface Variables
+    JMenuBar menuBar;
     int showGrid = 0;
     int colourMode = 1; // 1 - Normal colours | 0 - Inverted colours
     Color[] colourScheme = new Color[2];
@@ -99,6 +101,7 @@ public class GameOfLife extends JFrame implements ActionListener, MouseListener
      */
     public GameOfLife()
     {
+        getX();
         setTitle("Conway's Game of Life");
         this.getContentPane().setPreferredSize(new Dimension(SCREEN_WIDTH, SCREEN_HEIGHT));
         this.getContentPane().setLayout(null);
@@ -122,9 +125,8 @@ public class GameOfLife extends JFrame implements ActionListener, MouseListener
                     gameStep();
                     repaint();
                 }
-            } else {
-                mouseDownActions();
             }
+            mouseDownActions();
 
             try {
                 Thread.sleep(1);
@@ -157,11 +159,11 @@ public class GameOfLife extends JFrame implements ActionListener, MouseListener
                 } else {
                     ctx.setColor(colourScheme[1]);
                 }
-                ctx.fillRect(x*TILE_SIZE+OFFSETX, y*TILE_SIZE+OFFSETY, TILE_SIZE-showGrid, TILE_SIZE-showGrid);
+                ctx.fillRect(x*TILE_WIDTH+OFFSETX, y*TILE_HEIGHT+OFFSETY, TILE_WIDTH-showGrid, TILE_HEIGHT-showGrid);
                 if (mouseChangedTiles[y][x] == 1){
                     // Grey square on-top to signify change.
                     ctx.setColor(new Color(200, 200, 200, 110));
-                    ctx.fillRect(x*TILE_SIZE+OFFSETX, y*TILE_SIZE+OFFSETY, TILE_SIZE-showGrid, TILE_SIZE-showGrid);
+                    ctx.fillRect(x*TILE_WIDTH+OFFSETX, y*TILE_HEIGHT+OFFSETY, TILE_WIDTH-showGrid, TILE_HEIGHT-showGrid);
                 }
             }
         }
@@ -255,33 +257,7 @@ public class GameOfLife extends JFrame implements ActionListener, MouseListener
                 getFile.setLocationRelativeTo(this);
                 getFile.setVisible(true);
                 String userFile = getFile.getText();
-                String toDecode = FileScanner.readFile("./SavedGames/"+userFile+".txt");
-                if (!toDecode.equals("NoFileError")){
-                    int[][] decodedBoard = decodeGameBoard(toDecode);
-                    switch (decodedBoard[0][0]){
-                        case -1:
-                            createPopup("There are too many rows in that file!");
-                            break;
-                        case -2:
-                            createPopup("There are too many columns in that file!");
-                            break;
-                        case -3:
-                            createPopup("That file contains an invalid character!");
-                            break;
-                        default: // No error code!
-                            prevTileList = new int[TILE_COLS][TILE_ROWS];
-                            for (int y = 0; y < TILE_ROWS; y++){
-                                for (int x = 0; x < TILE_COLS; x++){
-                                    prevTileList[y][x] = tileList[y][x];
-                                    tileList[y][x] = decodedBoard[y][x];
-                                }
-                            }
-                            repaint();
-                            break;
-                    }
-                } else {
-                    createPopup("That file path was invalid! Open your SavedGames folder to view all files!");
-                }
+                loadBoard("./SavedGames/"+userFile+".txt", true);
                 break;
             case "Undo":
                 boolean canUndo = false;
@@ -301,6 +277,7 @@ public class GameOfLife extends JFrame implements ActionListener, MouseListener
                 }
                 repaint();
                 break;
+
             case "Toggle Grid":
                 showGrid = 1 - showGrid;
                 repaint();
@@ -359,6 +336,23 @@ public class GameOfLife extends JFrame implements ActionListener, MouseListener
                 colourScheme[1] = Color.BLACK;
                 repaint();
                 break;
+
+            case "Glider Gun":
+                loadBoard("./PresetGameBoards/GliderGun.txt", false);
+                repaint();
+                break;
+            case "Pascal's Triangle":
+                loadBoard("./PresetGameBoards/PascalTriangle.txt", true);
+                repaint();
+                break;
+            case "Big Glider":
+                loadBoard("./PresetGameBoards/BigGlider.txt", false);
+                repaint();
+                break;
+            case "Space Battle":
+                loadBoard("./PresetGameBoards/Battle.txt", true);
+                repaint();
+                break;
         }
     }
 
@@ -368,11 +362,12 @@ public class GameOfLife extends JFrame implements ActionListener, MouseListener
     public void mouseDownActions()
     {
         Point mouseLocation = MouseInfo.getPointerInfo().getLocation();
-        int mouseX = mouseLocation.x;
-        int mouseY = mouseLocation.y;
+        // Get mouse position relative to the window.
+        int mouseX = mouseLocation.x-getX();
+        int mouseY = mouseLocation.y-getY();
         // Get the tile the mouse is touching
-        int tileX = (mouseX-OFFSETX)/TILE_SIZE;
-        int tileY = (mouseY-OFFSETY)/TILE_SIZE;
+        int tileX = (mouseX-OFFSETX)/TILE_WIDTH;
+        int tileY = (mouseY-OFFSETY)/TILE_HEIGHT;
         // Fast and easy way to limit the X and Y to be within the tile list.
         tileX = Math.max(Math.min(tileX, TILE_COLS-1), 0);
         tileY = Math.max(Math.min(tileY, TILE_ROWS-1), 0);
@@ -444,6 +439,43 @@ public class GameOfLife extends JFrame implements ActionListener, MouseListener
     }
 
     /**
+     * Loads the game board from a file
+     *
+     * @param filePath - The path at which the target is located
+     * @param replaceAll - Whether the entire game board should be loaded, or just active tiles.
+     */
+    public void loadBoard(String filePath, boolean replaceAll)
+    {
+        String toDecode = FileScanner.readFile(filePath);
+        if (!toDecode.equals("NoFileError")){
+            int[][] decodedBoard = decodeGameBoard(toDecode);
+            switch (decodedBoard[0][0]){
+                case -1: // Row amount error
+                    createPopup("There are an incorrect amount of rows in that file!");
+                    break;
+                case -2: // Column amount error
+                    createPopup("There are an incorrect amount of columns in that file!");
+                    break;
+                case -3: // Invalid character error
+                    createPopup("That file contains an invalid character!");
+                    break;
+                default: // No error code!
+                    prevTileList = new int[TILE_COLS][TILE_ROWS];
+                    for (int y = 0; y < TILE_ROWS; y++){
+                        for (int x = 0; x < TILE_COLS; x++){
+                            prevTileList[y][x] = tileList[y][x];
+                            tileList[y][x] = decodedBoard[y][x] == 1 || replaceAll? decodedBoard[y][x] : tileList[y][x];
+                        }
+                    }
+                    repaint();
+                    break;
+            }
+        } else {
+            createPopup("That file path was invalid! Open your SavedGames folder to view all files!");
+        }
+    }
+
+    /**
      * Creates a popup alert with the given text.
      *
      * @param text - What the popup should say.
@@ -457,11 +489,9 @@ public class GameOfLife extends JFrame implements ActionListener, MouseListener
         popupMessage.setLocationRelativeTo(this);
     }
 
-    public void mouseExited(MouseEvent evt){
-    }
+    public void mouseExited(MouseEvent evt){}
 
-    public void mouseEntered(MouseEvent evt){
-    }
+    public void mouseEntered(MouseEvent evt){}
 
     public void mouseReleased(MouseEvent evt){
         if (mouseDown){
@@ -501,6 +531,10 @@ public class GameOfLife extends JFrame implements ActionListener, MouseListener
      */
     public void createMenuBars()
     {
+        // Menu Bar Variables
+        JMenu menu;
+        JMenu subMenu;
+        JMenuItem menuItem;
         // Define the menu bar.
         menuBar = new JMenuBar();
         this.setJMenuBar(menuBar);
@@ -532,10 +566,29 @@ public class GameOfLife extends JFrame implements ActionListener, MouseListener
         menuItem.setAccelerator(KeyStroke.getKeyStroke('p'));
         menuItem.addActionListener(this);
         menu.add(menuItem);
-        // Game : Print
+        // Game : Save
         menuItem = new JMenuItem("Save");
         menuItem.addActionListener(this);
         menu.add(menuItem);
+        // Game : Preset Boards
+        subMenu = new JMenu("Preset Boards");
+        menu.add(subMenu);
+        // Game : Preset Boards : Glider Gun
+        menuItem = new JMenuItem("Glider Gun");
+        menuItem.addActionListener(this);
+        subMenu.add(menuItem);
+        // Game : Preset Boards : Pascal's Triangle
+        menuItem = new JMenuItem("Pascal's Triangle");
+        menuItem.addActionListener(this);
+        subMenu.add(menuItem);
+        // Game : Preset Boards : Spaceship
+        menuItem = new JMenuItem("Big Glider");
+        menuItem.addActionListener(this);
+        subMenu.add(menuItem);
+        // Game : Preset Boards : Space Battle
+        menuItem = new JMenuItem("Space Battle");
+        menuItem.addActionListener(this);
+        subMenu.add(menuItem);
         // Game : Load
         menuItem = new JMenuItem("Load");
         menuItem.addActionListener(this);
@@ -555,7 +608,7 @@ public class GameOfLife extends JFrame implements ActionListener, MouseListener
         menuItem.addActionListener(this);
         menu.add(menuItem);
         // UI : Colour Scheme
-        JMenu subMenu = new JMenu("Colour Scheme");
+        subMenu = new JMenu("Colour Scheme");
         menu.add(subMenu);
         // UI : Colour Scheme : Default
         menuItem = new JMenuItem("Default");
