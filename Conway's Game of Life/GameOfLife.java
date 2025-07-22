@@ -66,24 +66,27 @@ public class GameOfLife extends JFrame implements ActionListener, MouseListener
 {
     // Global popup message variable to prevent alerts from stacking.
     Popup popupMessage;
-    // Screen Dimensions
-    final int SCREEN_WIDTH = 1280;
-    final int SCREEN_HEIGHT = 1280;
-    // The offset because java is stupid render!! (remake this comment before turning in project plz)
+    // The offset that JFrame renders with (on windows)
     final int OFFSETX = 8;
     final int OFFSETY = 54;
-    // Tile List
+    // Tile list dimensions
     final int TILE_ROWS = 80;
-    final int TILE_COLS = 80;
+    final int TILE_COLS = 120;
+    // Screen Dimensions
+    Dimension screenSize = Toolkit.getDefaultToolkit().getScreenSize();
+    int squareSize = (int) Math.min(screenSize.getWidth(), screenSize.getHeight())-OFFSETY*2; // Always uses OFFSETY to get a square instead of uneven rectangle.
+    final int SCREEN_WIDTH = squareSize/TILE_COLS*TILE_COLS;
+    final int SCREEN_HEIGHT = squareSize/TILE_ROWS*TILE_ROWS;
+    // Tile List
     final int TILE_WIDTH = SCREEN_WIDTH/TILE_COLS;
     final int TILE_HEIGHT = SCREEN_HEIGHT/TILE_ROWS;
-    int[][] tileList = new int[TILE_COLS][TILE_ROWS]; // List of tiles dead/alive
-    int[][] prevTileList = new int[TILE_COLS][TILE_ROWS]; // List of the previous tile list, for the undo action.
+    int[][] tileList = new int[TILE_ROWS][TILE_COLS]; // List of tiles dead/alive
+    int[][] prevTileList = new int[TILE_ROWS][TILE_COLS]; // List of the previous tile list, for the undo action.
 
     // Mouse Variables
     int[] mousePosition = new int[2]; // 0 - mouse x | 1 - mouse y
     boolean mouseDown = false;
-    int[][] mouseChangedTiles = new int[TILE_COLS][TILE_ROWS]; // An array of positions the mouse interacted with during 1 click.
+    int[][] mouseChangedTiles = new int[TILE_ROWS][TILE_COLS]; // An array of positions the mouse interacted with during 1 click.
     boolean didMouseChangeTile = false; // Checks if a tile was changed in the mouseChangedTiles array.
 
     // Interface Variables
@@ -101,7 +104,7 @@ public class GameOfLife extends JFrame implements ActionListener, MouseListener
      */
     public GameOfLife()
     {
-        getX();
+        System.out.println(SCREEN_WIDTH + "; " + SCREEN_HEIGHT);
         setTitle("Conway's Game of Life");
         this.getContentPane().setPreferredSize(new Dimension(SCREEN_WIDTH, SCREEN_HEIGHT));
         this.getContentPane().setLayout(null);
