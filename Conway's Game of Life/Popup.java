@@ -1,4 +1,3 @@
-
 /**
  * Creates a popup message.
  *
@@ -10,7 +9,7 @@ import javax.swing.*;
 public class Popup extends JDialog
 {
     /**
-     * Constructor for objects of class Popup
+     * Creates a popup with the message "text".
      */
     public Popup(String text)
     {

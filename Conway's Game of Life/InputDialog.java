@@ -1,4 +1,3 @@
-
 /**
  * Gets input from the user using a dialog box.
  *

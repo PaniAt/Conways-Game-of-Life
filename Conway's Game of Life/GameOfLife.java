@@ -54,7 +54,9 @@
  *      - Moved the actionPerformed method to make code cleaner.
  *      - Added a message when illegal characters are entered in save file name.
  *      - Fixed inaccurate debug messages when loading boards.
-
+ * @version 28/07/2025
+ *      - Changed the gameStep function slightly.
+ *      - Made mouse interactions off-board ignored.
  */
 // Imports for User Interface and GUI.
 import javax.swing.*;
@@ -103,6 +105,7 @@ public class GameOfLife extends JFrame implements ActionListener, MouseListener
     int colourMode = 1; // 1 - Normal colours | 0 - Inverted colours
     Color[] colourScheme = new Color[2];
     boolean debugMode = true;
+    private BufferedImage offScreenImage;
 
     // Timing Variables
     int gameTimer = 0;
@@ -137,7 +140,6 @@ public class GameOfLife extends JFrame implements ActionListener, MouseListener
                 }
             }
             mouseDownActions();
-
             try {
                 Thread.sleep(1);
             } catch (InterruptedException interrupt){
@@ -147,7 +149,6 @@ public class GameOfLife extends JFrame implements ActionListener, MouseListener
         }
     }
 
-    private BufferedImage offScreenImage;
     /**
      * Draws out the screen.
      * 
@@ -193,14 +194,13 @@ public class GameOfLife extends JFrame implements ActionListener, MouseListener
         // Get the tile the mouse is touching
         int tileX = (mouseX-OFFSETX)/TILE_WIDTH;
         int tileY = (mouseY-OFFSETY)/TILE_HEIGHT;
-        // Fast and easy way to limit the X and Y to be within the tile list.
-        tileX = Math.max(Math.min(tileX, TILE_COLS-1), 0);
-        tileY = Math.max(Math.min(tileY, TILE_ROWS-1), 0);
         // Switch the state of the tile and redraw the screen.
         if (mouseDown){
-            if (mouseChangedTiles[tileY][tileX] != 1){
-                mouseChangedTiles[tileY][tileX] = 1;
-                didMouseChangeTile = true;
+            if (tileX >= 0 && tileX < TILE_ROWS && tileY >= 0 && tileY < TILE_COLS){
+                if (mouseChangedTiles[tileY][tileX] != 1){
+                    mouseChangedTiles[tileY][tileX] = 1;
+                    didMouseChangeTile = true;
+                }
             }
             if (gameTimer % 50 == 0 && didMouseChangeTile){
                 repaint();
@@ -223,11 +223,7 @@ public class GameOfLife extends JFrame implements ActionListener, MouseListener
                     if (checky >= 0 && checky < TILE_ROWS){
                         for (int checkx = x-1; checkx <= x+1; checkx++){
                             if (checkx >= 0 && checkx < TILE_COLS){
-                                if (tileList[checky][checkx] == 1){
-                                    if (checky != y || checkx != x){
-                                        nearbyTiles++;
-                                    }
-                                }
+                                nearbyTiles += !(checky==y&&checkx==x)?tileList[checky][checkx]:0;
                             }
                         }
                     }

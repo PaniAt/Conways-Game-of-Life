@@ -1,4 +1,3 @@
-
 /**
  * Scans a file and returns the contents.
  * Modifed version of my old code from (exactly) 4 months ago.
