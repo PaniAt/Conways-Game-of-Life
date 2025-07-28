@@ -48,6 +48,13 @@
  * @version 22/07/2025
  *      - Added preset a few more preset game boards.
  *      - Allowed mouse actions during autoplay.
+ * @version 23/07/2025
+ *      - Made the screen now scale depending on display size.
+ *      - Fixed TILE_COLS and TILE_ROWS being switched.
+ *      - Moved the actionPerformed method to make code cleaner.
+ *      - Added a message when illegal characters are entered in save file name.
+ *      - Fixed inaccurate debug messages when loading boards.
+
  */
 // Imports for User Interface and GUI.
 import javax.swing.*;
@@ -66,15 +73,17 @@ public class GameOfLife extends JFrame implements ActionListener, MouseListener
 {
     // Global popup message variable to prevent alerts from stacking.
     Popup popupMessage;
-    // The offset that JFrame renders with (on windows)
+    // The offset that JFrame renders with.
     final int OFFSETX = 8;
     final int OFFSETY = 54;
     // Tile list dimensions
     final int TILE_ROWS = 80;
-    final int TILE_COLS = 120;
+    final int TILE_COLS = 80;
     // Screen Dimensions
     Dimension screenSize = Toolkit.getDefaultToolkit().getScreenSize();
-    int squareSize = (int) Math.min(screenSize.getWidth(), screenSize.getHeight())-OFFSETY*2; // Always uses OFFSETY to get a square instead of uneven rectangle.
+    // The game board should be a perfect square.
+    int squareSize = (int) Math.min(screenSize.getWidth(), screenSize.getHeight())-OFFSETY*2;
+    // Dividing then multiplying rounds to a factor of the tile array length.
     final int SCREEN_WIDTH = squareSize/TILE_COLS*TILE_COLS;
     final int SCREEN_HEIGHT = squareSize/TILE_ROWS*TILE_ROWS;
     // Tile List
@@ -90,7 +99,6 @@ public class GameOfLife extends JFrame implements ActionListener, MouseListener
     boolean didMouseChangeTile = false; // Checks if a tile was changed in the mouseChangedTiles array.
 
     // Interface Variables
-    JMenuBar menuBar;
     int showGrid = 0;
     int colourMode = 1; // 1 - Normal colours | 0 - Inverted colours
     Color[] colourScheme = new Color[2];
@@ -104,7 +112,6 @@ public class GameOfLife extends JFrame implements ActionListener, MouseListener
      */
     public GameOfLife()
     {
-        System.out.println(SCREEN_WIDTH + "; " + SCREEN_HEIGHT);
         setTitle("Conway's Game of Life");
         this.getContentPane().setPreferredSize(new Dimension(SCREEN_WIDTH, SCREEN_HEIGHT));
         this.getContentPane().setLayout(null);
@@ -175,191 +182,6 @@ public class GameOfLife extends JFrame implements ActionListener, MouseListener
     }
 
     /**
-     * Used for interactive menu bars.
-     *
-     * @param evt - The event action (given automatically)
-     */
-    public void actionPerformed(ActionEvent evt)
-    {
-        String cmd = evt.getActionCommand();
-        switch (cmd){
-            case "Quit":
-                System.exit(0);
-                break;
-            case "Reset":
-                prevTileList = tileList.clone();
-                tileList = new int[TILE_COLS][TILE_ROWS];
-                repaint();
-                break;
-            case "Step 1 Frame":
-                prevTileList = tileList.clone();
-                gameStep();
-                repaint();
-                break;
-            case "Step Custom Frames":
-                repaint();
-                InputDialog userInput = new InputDialog("Enter how many frames you want to step (1-1000):");
-                userInput.setLocationRelativeTo(this);
-                userInput.setVisible(true);
-                String userResponse = userInput.getText();
-                // I love ripping code out of my other projects!
-                try{ // The parseInt function will throw a NumberFormatException error if a non-integer is entered.
-                    int stepAmount = Integer.parseInt(userResponse);
-                    if (stepAmount < 1){ // There is no undoing your mistakes!
-                        createPopup("Please enter a number greater than 0!");
-                    } else if (stepAmount > 1000){ // Too many will make a huge delay.
-                        createPopup("Please enter a number fewer than 1,000!");
-                    } else {
-                        prevTileList = tileList.clone();
-                        for (int i = 0; i < stepAmount; i++){
-                            gameStep();
-                        }
-                        repaint();
-                    }
-                } catch(NumberFormatException e){ // The NumberFormatException is the only 'expected' error.
-                    createPopup("Please enter a number from 1 to 1,000!");
-                }
-                break;
-            case "Toggle Autoplay":
-                if (autoplay){
-                    autoplay = false;
-                } else {
-                    prevTileList = tileList.clone();
-                    autoplay = true;
-                }
-                repaint();
-                break;
-            case "Save":
-                repaint();
-                String board = getGameBoard();
-                InputDialog getSaveFile = new InputDialog("What do you want to name this save?");
-                getSaveFile.setLocationRelativeTo(this);
-                getSaveFile.setVisible(true);
-                String saveFileName = "./SavedGames/"+getSaveFile.getText()+".txt";
-                // Create the file, overrides any pre-existing file with the same name.
-                try{
-                    File saveFile = new File(saveFileName);
-                    if (!saveFile.createNewFile()){
-                        saveFile.delete();
-                        saveFile.createNewFile();
-                    }
-                    FileWriter fileWriter = new FileWriter(saveFileName);
-                    fileWriter.write(board);
-                    fileWriter.close(); // BlueJ said I'd have a memory leak, which sounds bad.
-                } catch (IOException e){
-                    if (debugMode){
-                        e.printStackTrace();
-                    }
-                    createPopup("There was an error creating the file!"); // "Help users recognise, diagnose and recover from errors"
-                }
-                repaint();
-                break;
-            case "Load":
-                repaint();
-                InputDialog getFile = new InputDialog("Enter the name of your file:");
-                getFile.setLocationRelativeTo(this);
-                getFile.setVisible(true);
-                String userFile = getFile.getText();
-                loadBoard("./SavedGames/"+userFile+".txt", true);
-                break;
-            case "Undo":
-                boolean canUndo = false;
-                for (int y = 0; y < TILE_ROWS && !canUndo; y++){
-                    for (int x = 0; x < TILE_COLS && !canUndo; x++){
-                        if (prevTileList[y][x] != tileList[y][x]){
-                            canUndo = true;
-                        }
-                    }
-                }
-                if (!canUndo){
-                    createPopup("There is nothing to undo!");
-                } else if (autoplay) {
-                    createPopup("You cannot undo while autoplay is active!");
-                } else{
-                    revertGameBoard();
-                }
-                repaint();
-                break;
-
-            case "Toggle Grid":
-                showGrid = 1 - showGrid;
-                repaint();
-                break;
-            case "Invert Colours":
-                colourMode = 1 - colourMode;
-                repaint();
-                break;
-            case "Red":
-                colourScheme[0] = new Color(240, 85, 110);
-                colourScheme[1] = new Color(220, 20, 50);
-                repaint();
-                break;
-            case "Orange":
-                colourScheme[0] = new Color(230, 95, 15);
-                colourScheme[1] = new Color(220, 50, 15);
-                repaint();
-                break;
-            case "Yellow":
-                colourScheme[0] = new Color(255, 190, 30);
-                colourScheme[1] = new Color(250, 169, 15);
-                repaint();
-                break;
-            case "Green":
-                colourScheme[0] = new Color(205, 255, 50);
-                colourScheme[1] = new Color(110, 220, 20);
-                repaint();
-                break;
-            case "Light Blue":
-                colourScheme[0] = new Color(145, 225, 240);
-                colourScheme[1] = new Color(0, 180, 220);
-                repaint();
-                break;
-            case "Dark Blue":
-                colourScheme[0] = new Color(0, 120, 180);
-                colourScheme[1] = new Color(10, 10, 95);
-                repaint();
-                break;
-            case "Purple":
-                colourScheme[0] = new Color(190, 100, 230);
-                colourScheme[1] = new Color(65, 10, 95);
-                repaint();
-                break;
-            case "Pink":
-                colourScheme[0] = new Color(255, 195, 230);
-                colourScheme[1] = new Color(255, 145, 180);
-                repaint();
-                break;
-            case "Grey":
-                colourScheme[0] = Color.GRAY;
-                colourScheme[1] = Color.DARK_GRAY;
-                repaint();
-                break;
-            case "Default":
-                colourScheme[0] = Color.WHITE;
-                colourScheme[1] = Color.BLACK;
-                repaint();
-                break;
-
-            case "Glider Gun":
-                loadBoard("./PresetGameBoards/GliderGun.txt", false);
-                repaint();
-                break;
-            case "Pascal's Triangle":
-                loadBoard("./PresetGameBoards/PascalTriangle.txt", true);
-                repaint();
-                break;
-            case "Big Glider":
-                loadBoard("./PresetGameBoards/BigGlider.txt", false);
-                repaint();
-                break;
-            case "Space Battle":
-                loadBoard("./PresetGameBoards/Battle.txt", true);
-                repaint();
-                break;
-        }
-    }
-
-    /**
      * Manages the actions which occur when the mouse is down.
      */
     public void mouseDownActions()
@@ -392,7 +214,7 @@ public class GameOfLife extends JFrame implements ActionListener, MouseListener
      */
     public void gameStep()
     {
-        int[][] targetTileList = new int[TILE_COLS][TILE_ROWS];
+        int[][] targetTileList = new int[TILE_ROWS][TILE_COLS];
         for (int y = 0; y < TILE_ROWS; y++){
             for (int x = 0; x < TILE_COLS; x++){
                 targetTileList[y][x] = tileList[y][x];
@@ -463,7 +285,7 @@ public class GameOfLife extends JFrame implements ActionListener, MouseListener
                     createPopup("That file contains an invalid character!");
                     break;
                 default: // No error code!
-                    prevTileList = new int[TILE_COLS][TILE_ROWS];
+                    prevTileList = new int[TILE_ROWS][TILE_COLS];
                     for (int y = 0; y < TILE_ROWS; y++){
                         for (int x = 0; x < TILE_COLS; x++){
                             prevTileList[y][x] = tileList[y][x];
@@ -499,7 +321,7 @@ public class GameOfLife extends JFrame implements ActionListener, MouseListener
     public void mouseReleased(MouseEvent evt){
         if (mouseDown){
             mouseDown = false;
-            prevTileList = new int[TILE_COLS][TILE_ROWS];
+            prevTileList = new int[TILE_ROWS][TILE_COLS];
             for(int y = 0; y < TILE_ROWS; y++){
                 for (int x = 0; x < TILE_COLS; x++){
                     prevTileList[y][x] = tileList[y][x];
@@ -521,12 +343,76 @@ public class GameOfLife extends JFrame implements ActionListener, MouseListener
             mouseDownActions();
         } else if (type == 3 && mouseDown) {
             mouseDown = false;
-            mouseChangedTiles = new int[TILE_COLS][TILE_ROWS];
+            mouseChangedTiles = new int[TILE_ROWS][TILE_COLS];
             repaint();
         }
     }
 
     public void mouseClicked(MouseEvent evt){}
+
+    /**
+     * Encodes the entire game board.
+     * 
+     * @return text - The entire game board.
+     */
+    public String getGameBoard()
+    {
+        String text = "";
+        for (int y = 0; y < TILE_ROWS; y++){
+            for (int x = 0; x < TILE_COLS; x++){
+                text = text+tileList[y][x]+(x==TILE_COLS-1? "" : ",");
+            }
+            text = text+(y!=TILE_ROWS-1?"-":"");
+        }
+        return text;
+    }
+
+    /**
+     * Decodes an encoded game board, returning the result in a 2 dimensional array.
+     *
+     * @param encodedBoard - The encoded game board, comma separated along the x axis and pipe separated along the y axis.
+     * @return The decoded version of the game board as an int[][] array.
+     */
+    public int[][] decodeGameBoard(String encodedBoard)
+    {
+        String[] stringBoardRows = encodedBoard.split("-");
+        int[][] errorBoard = new int[1][1]; // To output when an error occurs.
+        if (stringBoardRows.length != TILE_ROWS){
+            if (debugMode){
+                System.out.println("Error! Too "+(stringBoardRows.length<TILE_ROWS?"few":"many")+" rows!");
+                System.out.println("Expected: "+TILE_ROWS+"! Got: "+stringBoardRows.length+"!");
+            }
+            errorBoard[0][0] = -1;
+            return errorBoard; // Rows wrong
+        }
+        String[][] stringBoardFull = new String[TILE_ROWS][TILE_COLS];
+        for (int i = 0; i < stringBoardRows.length; i++){
+            if (stringBoardRows[i].split(",").length != TILE_COLS){
+                if (debugMode){
+                    System.out.println("Error! Too "+(stringBoardRows[i].split(",").length<TILE_COLS?"few":"many")+" columns at index: "+i+"!");
+                    System.out.println("Expected: "+TILE_COLS+"! Got: "+stringBoardRows[i].split(",").length+"!");
+                }
+                errorBoard[0][0] = -2;
+                return errorBoard; // Cols wrong
+            }
+            stringBoardFull[i] = stringBoardRows[i].split(",");
+        }
+        int[][] parsedBoard = new int[TILE_ROWS][TILE_COLS];
+        for (int y = 0; y < TILE_ROWS; y++){
+            for (int x = 0; x < TILE_COLS; x++){
+                if (!stringBoardFull[y][x].equals("1") && !stringBoardFull[y][x].equals("0")){
+                    if (debugMode){
+                        System.out.println("Error! Did not recieve either 0 or 1 when reading file!");
+                        System.out.println("At: (x:"+x+",y:"+y+"), Got: "+stringBoardFull[y][x]+"!"); 
+                    }
+                    errorBoard[0][0] = -3;
+                    return errorBoard; // Invalid tile state
+                }
+                parsedBoard[y][x] = Integer.parseInt(stringBoardFull[y][x]);
+            }
+        }
+        return parsedBoard;
+    }
 
     /**
      * Creates all the menu bars.
@@ -535,6 +421,7 @@ public class GameOfLife extends JFrame implements ActionListener, MouseListener
     public void createMenuBars()
     {
         // Menu Bar Variables
+        JMenuBar menuBar;
         JMenu menu;
         JMenu subMenu;
         JMenuItem menuItem;
@@ -660,72 +547,199 @@ public class GameOfLife extends JFrame implements ActionListener, MouseListener
     }
 
     /**
-     * Encodes the entire game board.
-     * 
-     * @return text - The entire game board.
-     */
-    public String getGameBoard()
-    {
-        String text = "";
-        for (int y = 0; y < TILE_ROWS; y++){
-            for (int x = 0; x < TILE_COLS; x++){
-                if (x == TILE_ROWS-1){
-                    text = text+tileList[y][x];
-                } else{
-                    text = text+tileList[y][x]+",";
-                }
-            }
-            if (y != TILE_COLS-1){
-                text = text+"-";
-            }
-        }
-        return text;
-    }
-
-    /**
-     * Decodes an encoded game board, returning the result in a 2 dimensional array.
+     * Used for interactive menu bars.
      *
-     * @param encodedBoard - The encoded game board, comma separated along the x axis and pipe separated along the y axis.
-     * @return The decoded version of the game board as an int[][] array.
+     * @param evt - The event action (given automatically)
      */
-    public int[][] decodeGameBoard(String encodedBoard)
+    public void actionPerformed(ActionEvent evt)
     {
-        String[] stringBoardRows = encodedBoard.split("-");
-        int[][] errorBoard = new int[1][1]; // To output when an error occurs.
-        if (stringBoardRows.length != TILE_ROWS){
-            if (debugMode){
-                System.out.println("Error! Too many rows in the encoded board!");
-                System.out.println("Expected: "+TILE_ROWS+"! Got: "+stringBoardRows.length+"!");
-            }
-            errorBoard[0][0] = -1;
-            return errorBoard; // Rows wrong
-        }
-        String[][] stringBoardFull = new String[TILE_ROWS][TILE_COLS];
-        for (int i = 0; i < stringBoardRows.length; i++){
-            if (stringBoardRows[i].split(",").length != TILE_COLS){
-                if (debugMode){
-                    System.out.println("Error! Too many cols in the encoded board at index: "+i+"!");
-                    System.out.println("Expected: "+TILE_COLS+"! Got: "+stringBoardRows[i].split(",").length+"!");
-                }
-                errorBoard[0][0] = -2;
-                return errorBoard; // Cols wrong
-            }
-            stringBoardFull[i] = stringBoardRows[i].split(",");
-        }
-        int[][] parsedBoard = new int[TILE_ROWS][TILE_COLS];
-        for (int y = 0; y < TILE_ROWS; y++){
-            for (int x = 0; x < TILE_COLS; x++){
-                if (!stringBoardFull[y][x].equals("1") && !stringBoardFull[y][x].equals("0")){
-                    if (debugMode){
-                        System.out.println("Error! Did not recieve either 0 or 1 when reading file!");
-                        System.out.println("At: (x:"+x+",y:"+y+"), Got: "+stringBoardFull[y][x]+"!"); 
+        String cmd = evt.getActionCommand();
+        switch (cmd){
+            case "Quit":
+                System.exit(0);
+                break;
+            case "Reset":
+                prevTileList = tileList.clone();
+                tileList = new int[TILE_ROWS][TILE_COLS];
+                repaint();
+                break;
+            case "Step 1 Frame":
+                prevTileList = tileList.clone();
+                gameStep();
+                repaint();
+                break;
+            case "Step Custom Frames":
+                repaint();
+                InputDialog userInput = new InputDialog("Enter how many frames you want to step (1-1000):");
+                userInput.setLocationRelativeTo(this);
+                userInput.setVisible(true);
+                String userResponse = userInput.getText();
+                // I love ripping code out of my other projects!
+                try{ // The parseInt function will throw a NumberFormatException error if a non-integer is entered.
+                    int stepAmount = Integer.parseInt(userResponse);
+                    if (stepAmount < 1){ // There is no undoing your mistakes!
+                        createPopup("Please enter a number greater than 0!");
+                    } else if (stepAmount > 1000){ // Too many will make a huge delay.
+                        createPopup("Please enter a number fewer than 1,000!");
+                    } else {
+                        prevTileList = tileList.clone();
+                        for (int i = 0; i < stepAmount; i++){
+                            gameStep();
+                        }
+                        repaint();
                     }
-                    errorBoard[0][0] = -3;
-                    return errorBoard; // Invalid tile state
+                } catch(NumberFormatException e){ // The NumberFormatException is the only 'expected' error.
+                    createPopup("Please enter a number from 1 to 1,000!");
                 }
-                parsedBoard[y][x] = Integer.parseInt(stringBoardFull[y][x]);
-            }
+                break;
+            case "Toggle Autoplay":
+                if (autoplay){
+                    autoplay = false;
+                } else {
+                    prevTileList = tileList.clone();
+                    autoplay = true;
+                }
+                repaint();
+                break;
+            case "Save":
+                repaint();
+                String board = getGameBoard();
+                InputDialog getSaveFile = new InputDialog("What do you want to name this save?");
+                getSaveFile.setLocationRelativeTo(this);
+                getSaveFile.setVisible(true);
+                String saveFileName = "./SavedGames/"+getSaveFile.getText()+".txt";
+                // Make sure there are no illegal characters.
+                String legalCharacters = "abcdefghijklmnopqrstuvwxyz1234567890 _-";
+                boolean validName = true;
+                for (int i = 0; i < getSaveFile.getText().split("").length && validName; i++){ // Evil.
+                    String c = getSaveFile.getText().split("")[i];
+                    if (legalCharacters.indexOf(c.toLowerCase()) < 0){
+                        createPopup("Please only use alphanumeric characters!");
+                        validName = false;
+                    }
+                }
+                if (validName){
+                    // Create the file, overrides any pre-existing file with the same name.
+                    try{
+                        File saveFile = new File(saveFileName);
+                        if (!saveFile.createNewFile()){
+                            saveFile.delete();
+                            saveFile.createNewFile();
+                        }
+                        FileWriter fileWriter = new FileWriter(saveFileName);
+                        fileWriter.write(board);
+                        fileWriter.close(); // BlueJ said I'd have a memory leak, which sounds bad.
+                    } catch (IOException e){
+                        if (debugMode){
+                            e.printStackTrace();
+                        }
+                        createPopup("There was an error creating the file!"); // "Help users recognise, diagnose and recover from errors"
+                    }
+                }
+                repaint();
+                break;
+            case "Load":
+                repaint();
+                InputDialog getFile = new InputDialog("Enter the name of your file:");
+                getFile.setLocationRelativeTo(this);
+                getFile.setVisible(true);
+                String userFile = getFile.getText();
+                loadBoard("./SavedGames/"+userFile+".txt", true);
+                break;
+            case "Undo":
+                boolean canUndo = false;
+                for (int y = 0; y < TILE_ROWS && !canUndo; y++){
+                    for (int x = 0; x < TILE_COLS && !canUndo; x++){
+                        if (prevTileList[y][x] != tileList[y][x]){
+                            canUndo = true;
+                        }
+                    }
+                }
+                if (!canUndo){
+                    createPopup("There is nothing to undo!");
+                } else if (autoplay) {
+                    createPopup("You cannot undo while autoplay is active!");
+                } else{
+                    revertGameBoard();
+                }
+                repaint();
+                break;
+
+            case "Toggle Grid":
+                showGrid = 1 - showGrid;
+                repaint();
+                break;
+            case "Invert Colours":
+                colourMode = 1 - colourMode;
+                repaint();
+                break;
+            case "Red":
+                colourScheme[0] = new Color(240, 85, 110);
+                colourScheme[1] = new Color(220, 20, 50);
+                repaint();
+                break;
+            case "Orange":
+                colourScheme[0] = new Color(230, 95, 15);
+                colourScheme[1] = new Color(220, 50, 15);
+                repaint();
+                break;
+            case "Yellow":
+                colourScheme[0] = new Color(255, 190, 30);
+                colourScheme[1] = new Color(250, 169, 15);
+                repaint();
+                break;
+            case "Green":
+                colourScheme[0] = new Color(205, 255, 50);
+                colourScheme[1] = new Color(110, 220, 20);
+                repaint();
+                break;
+            case "Light Blue":
+                colourScheme[0] = new Color(145, 225, 240);
+                colourScheme[1] = new Color(0, 180, 220);
+                repaint();
+                break;
+            case "Dark Blue":
+                colourScheme[0] = new Color(0, 120, 180);
+                colourScheme[1] = new Color(10, 10, 95);
+                repaint();
+                break;
+            case "Purple":
+                colourScheme[0] = new Color(190, 100, 230);
+                colourScheme[1] = new Color(65, 10, 95);
+                repaint();
+                break;
+            case "Pink":
+                colourScheme[0] = new Color(255, 195, 230);
+                colourScheme[1] = new Color(255, 145, 180);
+                repaint();
+                break;
+            case "Grey":
+                colourScheme[0] = Color.GRAY;
+                colourScheme[1] = Color.DARK_GRAY;
+                repaint();
+                break;
+            case "Default":
+                colourScheme[0] = Color.WHITE;
+                colourScheme[1] = Color.BLACK;
+                repaint();
+                break;
+
+            case "Glider Gun":
+                loadBoard("./PresetGameBoards/GliderGun.txt", false);
+                repaint();
+                break;
+            case "Pascal's Triangle":
+                loadBoard("./PresetGameBoards/PascalTriangle.txt", true);
+                repaint();
+                break;
+            case "Big Glider":
+                loadBoard("./PresetGameBoards/BigGlider.txt", false);
+                repaint();
+                break;
+            case "Space Battle":
+                loadBoard("./PresetGameBoards/Battle.txt", true);
+                repaint();
+                break;
         }
-        return parsedBoard;
     }
 }
