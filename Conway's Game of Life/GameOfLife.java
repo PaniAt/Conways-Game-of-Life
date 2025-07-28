@@ -57,6 +57,10 @@
  * @version 28/07/2025
  *      - Changed the gameStep function slightly.
  *      - Made mouse interactions off-board ignored.
+ * @version 29/07/2025
+ *      - Minor optimizations.
+ *      - Disabled debugMode by default.
+ *      - Removed the screen flash!
  */
 // Imports for User Interface and GUI.
 import javax.swing.*;
@@ -71,7 +75,7 @@ import java.io.FileWriter;
 import java.io.File;
 import java.io.IOException;
 
-public class GameOfLife extends JFrame implements ActionListener, MouseListener
+public class GameOfLife extends JFrame implements ActionListener, MouseListener, ComponentListener
 {
     // Global popup message variable to prevent alerts from stacking.
     Popup popupMessage;
@@ -104,14 +108,21 @@ public class GameOfLife extends JFrame implements ActionListener, MouseListener
     int showGrid = 0;
     int colourMode = 1; // 1 - Normal colours | 0 - Inverted colours
     Color[] colourScheme = new Color[2];
-    boolean debugMode = true;
+    boolean debugMode = false;
     private BufferedImage offScreenImage;
+    boolean firstPaint = true; // For fixing screen flash.
+
+    // Menu Bar Variables
+    JMenuBar menuBar;
+    JMenu menu;
+    JMenu subMenu;
+    JMenuItem menuItem;
 
     // Timing Variables
     int gameTimer = 0;
     boolean autoplay = false;
     /**
-     * Constructor for objects of class GameOfLife
+     * Begins the Game of Life.
      */
     public GameOfLife()
     {
@@ -119,11 +130,11 @@ public class GameOfLife extends JFrame implements ActionListener, MouseListener
         this.getContentPane().setPreferredSize(new Dimension(SCREEN_WIDTH, SCREEN_HEIGHT));
         this.getContentPane().setLayout(null);
         this.setDefaultCloseOperation(EXIT_ON_CLOSE);
-
-        createMenuBars();
-
+        createMenuBars(); // Make menu bars.
         addMouseListener(this); // For mouse events.
+        addComponentListener(this);
 
+        // Set colour scheme to default.
         colourScheme[0] = Color.WHITE;
         colourScheme[1] = Color.BLACK;
 
@@ -136,10 +147,10 @@ public class GameOfLife extends JFrame implements ActionListener, MouseListener
             if (autoplay){
                 if (gameTimer % 100 == 0){
                     gameStep();
-                    repaint();
                 }
             }
             mouseDownActions();
+            repaint();
             try {
                 Thread.sleep(1);
             } catch (InterruptedException interrupt){
@@ -152,10 +163,13 @@ public class GameOfLife extends JFrame implements ActionListener, MouseListener
     /**
      * Draws out the screen.
      * 
-     * @param g - The Graphics rendering thingy (given automatically)
+     * @param g - The Graphics render (given automatically)
      */
     public void paint(Graphics g){
-        super.paint(g);
+        if (firstPaint){
+            super.paint(g);
+            firstPaint = false;
+        }
         if (offScreenImage == null){
             offScreenImage = new BufferedImage(getWidth(), getHeight(), BufferedImage.TYPE_INT_ARGB);
         }
@@ -228,20 +242,9 @@ public class GameOfLife extends JFrame implements ActionListener, MouseListener
                         }
                     }
                 }
-                // Live cells with fewer than two neighbours DIES!
-                if (tileList[y][x] == 1 && nearbyTiles < 2) {
+                if (nearbyTiles < 2 || nearbyTiles > 3) { // More than 3 or less than 2 dies.
                     targetTileList[y][x] = 0;
-                }
-                // Live cells with two or three live neighbours DO NOTHING!
-                if (tileList[y][x] == 1 && (nearbyTiles == 2 || nearbyTiles == 3)){
-                    targetTileList[y][x] = 1;
-                }
-                // Live cells with more than three neighbours DIES!
-                if (tileList[y][x] == 1 && nearbyTiles > 3){
-                    targetTileList[y][x] = 0;
-                }
-                // Dead cells with exactly three neighbours REVIVES!
-                if (tileList[y][x] == 0 && nearbyTiles == 3){
+                }else if (nearbyTiles == 3){ // Cells with 3 neighbours revive
                     targetTileList[y][x] = 1;
                 }
             }
@@ -250,7 +253,7 @@ public class GameOfLife extends JFrame implements ActionListener, MouseListener
     }
 
     /**
-     * Undoes the user's last action that could've changed the board.
+     * Undoes the user's last action that changed the board.
      */
     public void revertGameBoard()
     {
@@ -410,17 +413,20 @@ public class GameOfLife extends JFrame implements ActionListener, MouseListener
         return parsedBoard;
     }
 
+    // For component listeners
+    public void componentHidden(ComponentEvent e){}
+    public void componentShown(ComponentEvent e){}
+    public void componentMoved(ComponentEvent e){}
+    public void componentResized(ComponentEvent e){
+        firstPaint = true;
+    }
+    
     /**
      * Creates all the menu bars.
      * I put it down here to make my code cleaner.
      */
     public void createMenuBars()
     {
-        // Menu Bar Variables
-        JMenuBar menuBar;
-        JMenu menu;
-        JMenu subMenu;
-        JMenuItem menuItem;
         // Define the menu bar.
         menuBar = new JMenuBar();
         this.setJMenuBar(menuBar);
@@ -428,6 +434,7 @@ public class GameOfLife extends JFrame implements ActionListener, MouseListener
         // The Game menu.
         menu = new JMenu("Game");
         menuBar.add(menu);
+        menu.getPopupMenu().setLightWeightPopupEnabled(false); // Prevents Canvas from drawing over the menu.
 
         // Game : Quit
         menuItem = new JMenuItem("Quit");
@@ -488,6 +495,7 @@ public class GameOfLife extends JFrame implements ActionListener, MouseListener
         // The UI menu.
         menu = new JMenu("Interface");
         menuBar.add(menu);
+        menu.getPopupMenu().setLightWeightPopupEnabled(false);
         // UI : Toggle Grid
         menuItem = new JMenuItem("Toggle Grid");
         menuItem.setAccelerator(KeyStroke.getKeyStroke('g'));
