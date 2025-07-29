@@ -61,6 +61,7 @@
  *      - Minor optimizations.
  *      - Disabled debugMode by default.
  *      - Removed the screen flash!
+ *      - Removed compatability with non-windows operating systems.
  */
 // Imports for User Interface and GUI.
 import javax.swing.*;
@@ -133,7 +134,7 @@ public class GameOfLife extends JFrame implements ActionListener, MouseListener,
         createMenuBars(); // Make menu bars.
         addMouseListener(this); // For mouse events.
         addComponentListener(this);
-
+        
         // Set colour scheme to default.
         colourScheme[0] = Color.WHITE;
         colourScheme[1] = Color.BLACK;
@@ -141,7 +142,6 @@ public class GameOfLife extends JFrame implements ActionListener, MouseListener,
         this.pack();
         this.toFront();
         this.setVisible(true);
-
         while (true){
             gameTimer++;
             if (autoplay){
@@ -237,7 +237,7 @@ public class GameOfLife extends JFrame implements ActionListener, MouseListener,
                     if (checky >= 0 && checky < TILE_ROWS){
                         for (int checkx = x-1; checkx <= x+1; checkx++){
                             if (checkx >= 0 && checkx < TILE_COLS){
-                                nearbyTiles += !(checky==y&&checkx==x)?tileList[checky][checkx]:0;
+                                nearbyTiles += (checky!=y||checkx!=x)?tileList[checky][checkx]:0;
                             }
                         }
                     }
@@ -314,9 +314,7 @@ public class GameOfLife extends JFrame implements ActionListener, MouseListener,
     }
 
     public void mouseExited(MouseEvent evt){}
-
     public void mouseEntered(MouseEvent evt){}
-
     public void mouseReleased(MouseEvent evt){
         if (mouseDown){
             mouseDown = false;
@@ -333,7 +331,6 @@ public class GameOfLife extends JFrame implements ActionListener, MouseListener,
             repaint();
         }
     }
-
     public void mousePressed(MouseEvent evt){
         int type = evt.getButton();
         if (type == 1){
@@ -346,7 +343,6 @@ public class GameOfLife extends JFrame implements ActionListener, MouseListener,
             repaint();
         }
     }
-
     public void mouseClicked(MouseEvent evt){}
 
     /**
@@ -418,7 +414,7 @@ public class GameOfLife extends JFrame implements ActionListener, MouseListener,
     public void componentShown(ComponentEvent e){}
     public void componentMoved(ComponentEvent e){}
     public void componentResized(ComponentEvent e){
-        firstPaint = true;
+        firstPaint = true; // Stop menuBar from breaking upon resize.
     }
     
     /**
